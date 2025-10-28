@@ -271,6 +271,7 @@ static const uint16_t kVerifySignatureAlgorithms[] = {
     // Larger hashes are acceptable.
     SSL_SIGN_ECDSA_SECP384R1_SHA384,
     SSL_SIGN_RSA_PSS_RSAE_SHA384,
+    SSL_SIGN_RSA_PSS_RSAE_SHA384, // For some reason it is twice in the WebView
     SSL_SIGN_RSA_PKCS1_SHA384,
 
     SSL_SIGN_RSA_PSS_RSAE_SHA512,

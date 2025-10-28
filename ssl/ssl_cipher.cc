@@ -165,6 +165,18 @@ static constexpr SSL_CIPHER kCiphers[] = {
         SSL_HANDSHAKE_MAC_SHA256,
     },
 
+    // Cipher C008
+    {
+        TLS1_TXT_ECDHE_ECDSA_WITH_DES_192_CBC3_SHA,
+        "TLS_ECDHE_ECDSA_WITH_3DES_EDE_CBC_SHA",
+        SSL_CIPHER_ECDHE_ECDSA_WITH_DES_192_CBC3_SHA,
+        SSL_kECDHE,
+        SSL_aECDSA,
+        SSL_3DES,
+        SSL_SHA1,
+        SSL_HANDSHAKE_MAC_DEFAULT,
+    },
+
     // Cipher C009
     {
         TLS1_TXT_ECDHE_ECDSA_WITH_AES_128_CBC_SHA,
@@ -185,6 +197,18 @@ static constexpr SSL_CIPHER kCiphers[] = {
         SSL_kECDHE,
         SSL_aECDSA,
         SSL_AES256,
+        SSL_SHA1,
+        SSL_HANDSHAKE_MAC_DEFAULT,
+    },
+
+    // Cipher C012
+    {
+        TLS1_TXT_ECDHE_RSA_WITH_DES_192_CBC3_SHA,
+        "TLS_ECDHE_RSA_WITH_3DES_EDE_CBC_SHA",
+        SSL_CIPHER_ECDHE_RSA_WITH_DES_192_CBC3_SHA,
+        SSL_kECDHE,
+        SSL_aRSA_DECRYPT,
+        SSL_3DES,
         SSL_SHA1,
         SSL_HANDSHAKE_MAC_DEFAULT,
     },
@@ -1021,7 +1045,9 @@ bool ssl_create_cipher_list(UniquePtr<SSLCipherPreferenceList> *out_cipher_list,
       SSL_CIPHER_ECDHE_PSK_WITH_CHACHA20_POLY1305_SHA256,
   };
   static const uint16_t kLegacyCiphers[] = {
+      SSL_CIPHER_ECDHE_ECDSA_WITH_DES_192_CBC3_SHA,
       SSL_CIPHER_ECDHE_ECDSA_WITH_AES_128_CBC_SHA,
+      SSL_CIPHER_ECDHE_RSA_WITH_DES_192_CBC3_SHA,
       SSL_CIPHER_ECDHE_RSA_WITH_AES_128_CBC_SHA,
       SSL_CIPHER_ECDHE_PSK_WITH_AES_128_CBC_SHA,
       SSL_CIPHER_ECDHE_ECDSA_WITH_AES_256_CBC_SHA,
