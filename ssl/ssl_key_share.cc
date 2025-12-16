@@ -455,9 +455,13 @@ Span<const NamedGroup> NamedGroups() { return kNamedGroups; }
 
 Span<const uint16_t> DefaultSupportedGroupIds() {
   static const uint16_t kDefaultSupportedGroupIds[] = {
+      SSL_GROUP_X25519_MLKEM768,
       SSL_GROUP_X25519,
       SSL_GROUP_SECP256R1,
       SSL_GROUP_SECP384R1,
+#if !defined(OPENSSL_ANDROID)
+      SSL_GROUP_SECP521R1,
+#endif
   };
   return Span(kDefaultSupportedGroupIds);
 }

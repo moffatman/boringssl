@@ -271,14 +271,18 @@ static const uint16_t kVerifySignatureAlgorithms[] = {
     // Larger hashes are acceptable.
     SSL_SIGN_ECDSA_SECP384R1_SHA384,
     SSL_SIGN_RSA_PSS_RSAE_SHA384,
+#if !defined(OPENSSL_ANDROID)
     SSL_SIGN_RSA_PSS_RSAE_SHA384, // For some reason it is twice in the WebView
+#endif
     SSL_SIGN_RSA_PKCS1_SHA384,
 
     SSL_SIGN_RSA_PSS_RSAE_SHA512,
     SSL_SIGN_RSA_PKCS1_SHA512,
 
+#if !defined(OPENSSL_ANDROID)
     // For now, SHA-1 is still accepted but least preferable.
     SSL_SIGN_RSA_PKCS1_SHA1,
+#endif
 };
 
 // kSignSignatureAlgorithms is the default list of supported signature
