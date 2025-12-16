@@ -367,6 +367,9 @@ Span<const uint16_t> DefaultSupportedGroupIds() {
       SSL_GROUP_X25519,
       SSL_GROUP_SECP256R1,
       SSL_GROUP_SECP384R1,
+#if !defined(OPENSSL_ANDROID)
+      SSL_GROUP_SECP521R1,
+#endif
   };
   return Span(kDefaultSupportedGroupIds);
 }
