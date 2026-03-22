@@ -76,8 +76,51 @@ static void poly1305_update_length(poly1305_state *poly1305, size_t data_len) {
   CRYPTO_poly1305_update(poly1305, length_bytes, sizeof(length_bytes));
 }
 
+typedef void (*aead_poly1305_update)(poly1305_state *ctx, const uint8_t *ad,
+                                     size_t ad_len, const uint8_t *ciphertext,
+                                     size_t ciphertext_len);
+
 // calc_tag fills |tag| with the authentication tag for the given inputs.
 static void calc_tag(uint8_t tag[POLY1305_TAG_LEN], const uint8_t *key,
+                     const uint8_t nonce[12], const uint8_t *ad, size_t ad_len,
+                     const uint8_t *ciphertext, size_t ciphertext_len,
+                     const uint8_t *ciphertext_extra,
+                     size_t ciphertext_extra_len,
+                     bool old) {
+  alignas(16) uint8_t poly1305_key[32];
+  OPENSSL_memset(poly1305_key, 0, sizeof(poly1305_key));
+  CRYPTO_chacha_20(poly1305_key, poly1305_key, sizeof(poly1305_key), key, nonce,
+                   0);
+
+  static const uint8_t padding[16] = { 0 };  // Padding is all zeros.
+  poly1305_state ctx;
+  const size_t ciphertext_total = ciphertext_len + ciphertext_extra_len;
+  CRYPTO_poly1305_init(&ctx, poly1305_key);
+  if (old) {
+    CRYPTO_poly1305_update(&ctx, ad, ad_len);
+    poly1305_update_length(&ctx, ad_len);
+    CRYPTO_poly1305_update(&ctx, ciphertext, ciphertext_len);
+    CRYPTO_poly1305_update(&ctx, ciphertext_extra, ciphertext_extra_len);
+    poly1305_update_length(&ctx, ciphertext_total);
+  }
+  else {
+    CRYPTO_poly1305_update(&ctx, ad, ad_len);
+    if (ad_len % 16 != 0) {
+      CRYPTO_poly1305_update(&ctx, padding, sizeof(padding) - (ad_len % 16));
+    }
+    CRYPTO_poly1305_update(&ctx, ciphertext, ciphertext_len);
+    CRYPTO_poly1305_update(&ctx, ciphertext_extra, ciphertext_extra_len);
+    if (ciphertext_total % 16 != 0) {
+      CRYPTO_poly1305_update(&ctx, padding,
+                            sizeof(padding) - (ciphertext_total % 16));
+    }
+    poly1305_update_length(&ctx, ad_len);
+    poly1305_update_length(&ctx, ciphertext_total);
+  }
+  CRYPTO_poly1305_finish(&ctx, tag);
+}
+
+static void calc_tag_old(uint8_t tag[POLY1305_TAG_LEN], const uint8_t *key,
                      const uint8_t nonce[12], const uint8_t *ad, size_t ad_len,
                      const uint8_t *ciphertext, size_t ciphertext_len,
                      const uint8_t *ciphertext_extra,
@@ -87,22 +130,8 @@ static void calc_tag(uint8_t tag[POLY1305_TAG_LEN], const uint8_t *key,
   CRYPTO_chacha_20(poly1305_key, poly1305_key, sizeof(poly1305_key), key, nonce,
                    0);
 
-  static const uint8_t padding[16] = { 0 };  // Padding is all zeros.
   poly1305_state ctx;
   CRYPTO_poly1305_init(&ctx, poly1305_key);
-  CRYPTO_poly1305_update(&ctx, ad, ad_len);
-  if (ad_len % 16 != 0) {
-    CRYPTO_poly1305_update(&ctx, padding, sizeof(padding) - (ad_len % 16));
-  }
-  CRYPTO_poly1305_update(&ctx, ciphertext, ciphertext_len);
-  CRYPTO_poly1305_update(&ctx, ciphertext_extra, ciphertext_extra_len);
-  const size_t ciphertext_total = ciphertext_len + ciphertext_extra_len;
-  if (ciphertext_total % 16 != 0) {
-    CRYPTO_poly1305_update(&ctx, padding,
-                           sizeof(padding) - (ciphertext_total % 16));
-  }
-  poly1305_update_length(&ctx, ad_len);
-  poly1305_update_length(&ctx, ciphertext_total);
   CRYPTO_poly1305_finish(&ctx, tag);
 }
 
@@ -110,7 +139,8 @@ static int chacha20_poly1305_seal_scatter(
     const uint8_t *key, uint8_t *out, uint8_t *out_tag,
     size_t *out_tag_len, size_t max_out_tag_len, const uint8_t *nonce,
     size_t nonce_len, const uint8_t *in, size_t in_len, const uint8_t *extra_in,
-    size_t extra_in_len, const uint8_t *ad, size_t ad_len, size_t tag_len) {
+    size_t extra_in_len, const uint8_t *ad, size_t ad_len, size_t tag_len,
+    bool old) {
   if (extra_in_len + tag_len < tag_len) {
     OPENSSL_PUT_ERROR(CIPHER, CIPHER_R_TOO_LARGE);
     return 0;
@@ -162,7 +192,7 @@ static int chacha20_poly1305_seal_scatter(
   }
 
   union chacha20_poly1305_seal_data data;
-  if (chacha20_poly1305_asm_capable()) {
+  if (chacha20_poly1305_asm_capable() && !old) {
     OPENSSL_memcpy(data.in.key, key, 32);
     data.in.counter = 0;
     OPENSSL_memcpy(data.in.nonce, nonce, 12);
@@ -172,7 +202,7 @@ static int chacha20_poly1305_seal_scatter(
   } else {
     CRYPTO_chacha_20(out, in, in_len, key, nonce, 1);
     calc_tag(data.out.tag, key, nonce, ad, ad_len, out, in_len, out_tag,
-             extra_in_len);
+             extra_in_len, old);
   }
 
   OPENSSL_memcpy(out_tag + extra_in_len, data.out.tag, tag_len);
@@ -190,7 +220,30 @@ static int aead_chacha20_poly1305_seal_scatter(
 
   return chacha20_poly1305_seal_scatter(
       c20_ctx->key, out, out_tag, out_tag_len, max_out_tag_len, nonce,
-      nonce_len, in, in_len, extra_in, extra_in_len, ad, ad_len, ctx->tag_len);
+      nonce_len, in, in_len, extra_in, extra_in_len, ad, ad_len, ctx->tag_len, false);
+}
+
+static int aead_chacha20_poly1305_old_seal_scatter(
+    const EVP_AEAD_CTX *ctx, uint8_t *out, uint8_t *out_tag,
+    size_t *out_tag_len, size_t max_out_tag_len, const uint8_t *nonce,
+    size_t nonce_len, const uint8_t *in, size_t in_len, const uint8_t *extra_in,
+    size_t extra_in_len, const uint8_t *ad, size_t ad_len) {
+  const struct aead_chacha20_poly1305_ctx *c20_ctx =
+      (struct aead_chacha20_poly1305_ctx *)&ctx->state;
+
+  if (nonce_len != 8) {
+    OPENSSL_PUT_ERROR(CIPHER, CIPHER_R_UNSUPPORTED_NONCE_SIZE);
+    return 0;
+  }
+
+  alignas(4) uint8_t nonce_96[12];
+  OPENSSL_memset(nonce_96, 0, 4);
+  OPENSSL_memcpy(&nonce_96[4], nonce, 8);
+
+  return chacha20_poly1305_seal_scatter(
+      c20_ctx->key, out, out_tag, out_tag_len, max_out_tag_len,
+      nonce_96, sizeof(nonce_96), in, in_len, extra_in, extra_in_len,
+      ad, ad_len, ctx->tag_len, true);
 }
 
 static int aead_xchacha20_poly1305_seal_scatter(
@@ -215,13 +268,14 @@ static int aead_xchacha20_poly1305_seal_scatter(
   return chacha20_poly1305_seal_scatter(
       derived_key, out, out_tag, out_tag_len, max_out_tag_len,
       derived_nonce, sizeof(derived_nonce), in, in_len, extra_in, extra_in_len,
-      ad, ad_len, ctx->tag_len);
+      ad, ad_len, ctx->tag_len, false);
 }
 
 static int chacha20_poly1305_open_gather(
     const uint8_t *key, uint8_t *out, const uint8_t *nonce,
     size_t nonce_len, const uint8_t *in, size_t in_len, const uint8_t *in_tag,
-    size_t in_tag_len, const uint8_t *ad, size_t ad_len, size_t tag_len) {
+    size_t in_tag_len, const uint8_t *ad, size_t ad_len, size_t tag_len,
+    bool old) {
   if (nonce_len != 12) {
     OPENSSL_PUT_ERROR(CIPHER, CIPHER_R_UNSUPPORTED_NONCE_SIZE);
     return 0;
@@ -245,13 +299,13 @@ static int chacha20_poly1305_open_gather(
   }
 
   union chacha20_poly1305_open_data data;
-  if (chacha20_poly1305_asm_capable()) {
+  if (chacha20_poly1305_asm_capable() && !old) {
     OPENSSL_memcpy(data.in.key, key, 32);
     data.in.counter = 0;
     OPENSSL_memcpy(data.in.nonce, nonce, 12);
     chacha20_poly1305_open(out, in, in_len, ad, ad_len, &data);
   } else {
-    calc_tag(data.out.tag, key, nonce, ad, ad_len, in, in_len, NULL, 0);
+    calc_tag(data.out.tag, key, nonce, ad, ad_len, in, in_len, NULL, 0, old);
     CRYPTO_chacha_20(out, in, in_len, key, nonce, 1);
   }
 
@@ -272,7 +326,28 @@ static int aead_chacha20_poly1305_open_gather(
 
   return chacha20_poly1305_open_gather(c20_ctx->key, out, nonce, nonce_len, in,
                                        in_len, in_tag, in_tag_len, ad, ad_len,
-                                       ctx->tag_len);
+                                       ctx->tag_len, false);
+}
+
+static int aead_chacha20_poly1305_old_open_gather(
+    const EVP_AEAD_CTX *ctx, uint8_t *out, const uint8_t *nonce,
+    size_t nonce_len, const uint8_t *in, size_t in_len, const uint8_t *in_tag,
+    size_t in_tag_len, const uint8_t *ad, size_t ad_len) {
+  const struct aead_chacha20_poly1305_ctx *c20_ctx =
+      (struct aead_chacha20_poly1305_ctx *)&ctx->state;
+
+  if (nonce_len != 8) {
+    OPENSSL_PUT_ERROR(CIPHER, CIPHER_R_UNSUPPORTED_NONCE_SIZE);
+    return 0;
+  }
+
+  alignas(4) uint8_t nonce_96[12];
+  OPENSSL_memset(nonce_96, 0, 4);
+  OPENSSL_memcpy(&nonce_96[4], nonce, 8);
+
+  return chacha20_poly1305_open_gather(
+      c20_ctx->key, out, nonce_96, sizeof(nonce_96), in, in_len,
+      in_tag, in_tag_len, ad, ad_len, ctx->tag_len, true);
 }
 
 static int aead_xchacha20_poly1305_open_gather(
@@ -295,7 +370,7 @@ static int aead_xchacha20_poly1305_open_gather(
 
   return chacha20_poly1305_open_gather(
       derived_key, out, derived_nonce, sizeof(derived_nonce), in, in_len,
-      in_tag, in_tag_len, ad, ad_len, ctx->tag_len);
+      in_tag, in_tag_len, ad, ad_len, ctx->tag_len, false);
 }
 
 static const EVP_AEAD aead_chacha20_poly1305 = {
@@ -313,6 +388,22 @@ static const EVP_AEAD aead_chacha20_poly1305 = {
     aead_chacha20_poly1305_open_gather,
     NULL,  // get_iv
     NULL,  // tag_len
+};
+
+static const EVP_AEAD aead_chacha20_poly1305_old = {
+    32,                // key len
+    8,                 // nonce len
+    POLY1305_TAG_LEN,  // overhead
+    POLY1305_TAG_LEN,  // max tag length
+    0,                 // seal_scatter_supports_extra_in
+    aead_chacha20_poly1305_init,
+    NULL, /* init_with_direction */
+    aead_chacha20_poly1305_cleanup,
+    NULL, /* open */
+    aead_chacha20_poly1305_old_seal_scatter,
+    aead_chacha20_poly1305_old_open_gather,
+    NULL,               /* get_rc4_state */
+    NULL,               /* get_iv */
 };
 
 static const EVP_AEAD aead_xchacha20_poly1305 = {
@@ -334,6 +425,10 @@ static const EVP_AEAD aead_xchacha20_poly1305 = {
 
 const EVP_AEAD *EVP_aead_chacha20_poly1305(void) {
   return &aead_chacha20_poly1305;
+}
+
+const EVP_AEAD *EVP_aead_chacha20_poly1305_old(void) {
+  return &aead_chacha20_poly1305_old;
 }
 
 const EVP_AEAD *EVP_aead_xchacha20_poly1305(void) {

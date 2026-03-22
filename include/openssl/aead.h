@@ -125,6 +125,11 @@ OPENSSL_EXPORT const EVP_AEAD *EVP_aead_aes_256_gcm(void);
 // Poly1305 as described in RFC 8439.
 OPENSSL_EXPORT const EVP_AEAD *EVP_aead_chacha20_poly1305(void);
 
+/* EVP_aead_chacha20_poly1305_old is an AEAD built from ChaCha20 and
+ * Poly1305 that is used in the experimental ChaCha20-Poly1305 TLS cipher
+ * suites. */
+OPENSSL_EXPORT const EVP_AEAD *EVP_aead_chacha20_poly1305_old(void);
+
 // EVP_aead_xchacha20_poly1305 is ChaCha20-Poly1305 with an extended nonce that
 // makes random generation of nonces safe.
 OPENSSL_EXPORT const EVP_AEAD *EVP_aead_xchacha20_poly1305(void);

@@ -327,6 +327,30 @@ static constexpr SSL_CIPHER kCiphers[] = {
 
     // ChaCha20-Poly1305 cipher suites.
 
+    // Cipher CC13
+    {
+        TLS1_TXT_ECDHE_RSA_WITH_CHACHA20_POLY1305_OLD,
+        "TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_OLD",
+        SSL_CIPHER_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256_OLD,
+        SSL_kECDHE,
+        SSL_aRSA_SIGN,
+        SSL_CHACHA20POLY1305_OLD,
+        SSL_AEAD,
+        SSL_HANDSHAKE_MAC_SHA256,
+    },
+
+    // Cipher CC14
+    {
+        TLS1_TXT_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_OLD,
+        "TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_OLD",
+        SSL_CIPHER_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256_OLD,
+        SSL_kECDHE,
+        SSL_aECDSA,
+        SSL_CHACHA20POLY1305_OLD,
+        SSL_AEAD,
+        SSL_HANDSHAKE_MAC_SHA256,
+    },
+
     // Cipher CCA8
     {
         TLS1_TXT_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256,
@@ -499,6 +523,9 @@ bool ssl_cipher_get_evp_aead(const EVP_AEAD **out_aead,
     } else if (cipher->algorithm_enc == SSL_CHACHA20POLY1305) {
       *out_aead = EVP_aead_chacha20_poly1305();
       *out_fixed_iv_len = 12;
+    } else if (cipher->algorithm_enc == SSL_CHACHA20POLY1305_OLD) {
+      *out_aead = EVP_aead_chacha20_poly1305_old();
+      *out_fixed_iv_len = 0;
     } else {
       return false;
     }
@@ -667,7 +694,8 @@ void SSLCipherPreferenceList::Remove(const SSL_CIPHER *cipher) {
 
 bool ssl_cipher_is_deprecated(const SSL_CIPHER *cipher) {
   return cipher->protocol_id == SSL_CIPHER_ECDHE_RSA_WITH_AES_128_CBC_SHA256 ||
-         cipher->algorithm_enc == SSL_3DES;
+         cipher->algorithm_enc == SSL_3DES ||
+         cipher->algorithm_enc == SSL_CHACHA20POLY1305_OLD;
 }
 
 // ssl_cipher_apply_rule applies the rule type |rule| to ciphers matching its
@@ -1043,6 +1071,8 @@ bool ssl_create_cipher_list(UniquePtr<SSLCipherPreferenceList> *out_cipher_list,
       SSL_CIPHER_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256,
       SSL_CIPHER_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256,
       SSL_CIPHER_ECDHE_PSK_WITH_CHACHA20_POLY1305_SHA256,
+      SSL_CIPHER_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256_OLD,
+      SSL_CIPHER_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256_OLD,
   };
   static const uint16_t kLegacyCiphers[] = {
       SSL_CIPHER_ECDHE_ECDSA_WITH_DES_192_CBC3_SHA,
@@ -1275,6 +1305,7 @@ int SSL_CIPHER_get_cipher_nid(const SSL_CIPHER *cipher) {
     case SSL_AES256GCM:
       return NID_aes_256_gcm;
     case SSL_CHACHA20POLY1305:
+    case SSL_CHACHA20POLY1305_OLD:
       return NID_chacha20_poly1305;
   }
   assert(0);
@@ -1439,6 +1470,7 @@ int SSL_CIPHER_get_bits(const SSL_CIPHER *cipher, int *out_alg_bits) {
     case SSL_AES256:
     case SSL_AES256GCM:
     case SSL_CHACHA20POLY1305:
+    case SSL_CHACHA20POLY1305_OLD:
       alg_bits = 256;
       strength_bits = 256;
       break;
@@ -1537,6 +1569,10 @@ const char *SSL_CIPHER_description(const SSL_CIPHER *cipher, char *buf,
 
     case SSL_CHACHA20POLY1305:
       enc = "ChaCha20-Poly1305";
+      break;
+
+    case SSL_CHACHA20POLY1305_OLD:
+      enc = "ChaCha20-Poly1305-old";
       break;
 
     default:
