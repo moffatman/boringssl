@@ -4288,6 +4288,8 @@ class SSLContext : public ssl_ctx_st, public RefCounted<SSLContext> {
   // signal its sessions may be resumed across names in the server certificate.
   bool resumption_across_names_enabled : 1;
 
+  bool always_add_padding = false;
+
  private:
   friend RefCounted;
   ~SSLContext();

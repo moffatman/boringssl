@@ -3338,6 +3338,10 @@ void SSL_set_permute_extensions(SSL *ssl, int enabled) {
   ssl_impl->config->permute_extensions = !!enabled;
 }
 
+void SSL_CTX_set_always_add_padding(SSL_CTX *ctx, int enabled) {
+  ctx->always_add_padding = !!enabled;
+}
+
 int32_t SSL_get_ticket_age_skew(const SSL *ssl) {
   return FromOpaque(ssl)->s3->ticket_age_skew;
 }

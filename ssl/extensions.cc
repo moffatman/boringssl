@@ -4549,8 +4549,8 @@ bool ssl_add_clienthello_tlsext(SSL_HANDSHAKE *hs, CBB *out, CBB *out_encoded,
   // intolerant to the last extension being zero-length. See
   // https://crbug.com/363583.
   bool offering_psk = should_offer_psk(hs, type);
-  if (!offering_psk && last_was_empty && !SSL_is_dtls(ssl) &&
-      !SSL_is_quic(ssl) && !ssl->s3->used_hello_retry_request) {
+  if (ssl->ctx->always_add_padding || (!offering_psk && last_was_empty && !SSL_is_dtls(ssl) &&
+      !SSL_is_quic(ssl) && !ssl->s3->used_hello_retry_request)) {
     if (!add_padding_extension(&extensions, TLSEXT_TYPE_padding, 1)) {
       return false;
     }
