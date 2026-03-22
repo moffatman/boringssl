@@ -119,7 +119,8 @@ static int chacha20_poly1305_sealv(const uint8_t *key,
                                    Span<uint8_t> out_tag, size_t *out_tag_len,
                                    Span<const uint8_t> nonce,
                                    Span<const CRYPTO_IVEC> aadvecs,
-                                   size_t tag_len) {
+                                   size_t tag_len,
+                                   bool old) {
   if (out_tag.size() < tag_len) {
     OPENSSL_PUT_ERROR(CIPHER, CIPHER_R_BUFFER_TOO_SMALL);
     return 0;
@@ -143,7 +144,7 @@ static int chacha20_poly1305_sealv(const uint8_t *key,
 
   union chacha20_poly1305_seal_data data;
   if (chacha20_poly1305_asm_capable() && iovecs.size() <= 2 &&
-      aadvecs.size() <= 1) {
+      aadvecs.size() <= 1 && !old) {
     OPENSSL_memcpy(data.in.key, key, 32);
     data.in.counter = 0;
     CopySpan(nonce, data.in.nonce);
@@ -186,7 +187,22 @@ static int chacha20_poly1305_sealv(const uint8_t *key,
                            aadvecs.size() >= 1 ? aadvecs[0].len : 0, &data);
   } else {
     poly1305_state ctx;
-    size_t ad_len = calc_tag_pre(&ctx, key, nonce.data(), aadvecs);
+    size_t ad_len = 0;
+    if (old) {
+      alignas(16) uint8_t poly1305_key[32];
+      OPENSSL_memset(poly1305_key, 0, sizeof(poly1305_key));
+      CRYPTO_chacha_20(poly1305_key, poly1305_key, sizeof(poly1305_key), key, nonce.data(),
+                      0);
+
+      CRYPTO_poly1305_init(&ctx, poly1305_key);
+      for (const CRYPTO_IVEC &aadvec : aadvecs) {
+        CRYPTO_poly1305_update(&ctx, aadvec.in, aadvec.len);
+        ad_len += aadvec.len;
+      }
+      poly1305_update_length(&ctx, ad_len);
+    } else {
+      ad_len = calc_tag_pre(&ctx, key, nonce.data(), aadvecs);
+    }
 
     size_t ciphertext_total = 0;
     size_t block = 1;
@@ -210,7 +226,12 @@ static int chacha20_poly1305_sealv(const uint8_t *key,
           return true;
         });
 
-    calc_tag_post(&ctx, data.out.tag, ciphertext_total, ad_len);
+    if (old) {
+      poly1305_update_length(&ctx, ciphertext_total);
+      CRYPTO_poly1305_finish(&ctx, data.out.tag);
+    } else {
+      calc_tag_post(&ctx, data.out.tag, ciphertext_total, ad_len);
+    }
   }
 
   CopyToPrefix(Span(data.out.tag).first(tag_len), out_tag);
@@ -228,7 +249,29 @@ static int aead_chacha20_poly1305_sealv(const EVP_AEAD_CTX *ctx,
       (struct aead_chacha20_poly1305_ctx *)&ctx->state;
 
   return chacha20_poly1305_sealv(c20_ctx->key, iovecs, out_tag, out_tag_len,
-                                 nonce, aadvecs, ctx->tag_len);
+                                 nonce, aadvecs, ctx->tag_len, false);
+}
+
+static int aead_chacha20_poly1305_old_sealv(const EVP_AEAD_CTX *ctx,
+                                            Span<const CRYPTO_IOVEC> iovecs,
+                                            Span<uint8_t> out_tag,
+                                            size_t *out_tag_len,
+                                            Span<const uint8_t> nonce,
+                                            Span<const CRYPTO_IVEC> aadvecs) {
+  const struct aead_chacha20_poly1305_ctx *c20_ctx =
+      (struct aead_chacha20_poly1305_ctx *)&ctx->state;
+  
+  if (nonce.size() != 8) {
+    OPENSSL_PUT_ERROR(CIPHER, CIPHER_R_UNSUPPORTED_NONCE_SIZE);
+    return 0;
+  }
+
+  alignas(4) uint8_t nonce_96[12];
+  OPENSSL_memset(nonce_96, 0, 4);
+  OPENSSL_memcpy(&nonce_96[4], nonce.data(), 8);
+
+  return chacha20_poly1305_sealv(c20_ctx->key, iovecs, out_tag, out_tag_len,
+                                 nonce_96, aadvecs, ctx->tag_len, true);
 }
 
 static int aead_xchacha20_poly1305_sealv(const EVP_AEAD_CTX *ctx,
@@ -252,7 +295,7 @@ static int aead_xchacha20_poly1305_sealv(const EVP_AEAD_CTX *ctx,
   OPENSSL_memcpy(&derived_nonce[4], &nonce[16], 8);
 
   return chacha20_poly1305_sealv(derived_key, iovecs, out_tag, out_tag_len,
-                                 derived_nonce, aadvecs, ctx->tag_len);
+                                 derived_nonce, aadvecs, ctx->tag_len, false);
 }
 
 static int chacha20_poly1305_openv_detached(const uint8_t *key,
@@ -260,7 +303,8 @@ static int chacha20_poly1305_openv_detached(const uint8_t *key,
                                             Span<const uint8_t> nonce,
                                             Span<const uint8_t> in_tag,
                                             Span<const CRYPTO_IVEC> aadvecs,
-                                            size_t tag_len) {
+                                            size_t tag_len,
+                                            bool old) {
   if (nonce.size() != 12) {
     OPENSSL_PUT_ERROR(CIPHER, CIPHER_R_UNSUPPORTED_NONCE_SIZE);
     return 0;
@@ -285,7 +329,7 @@ static int chacha20_poly1305_openv_detached(const uint8_t *key,
 
   union chacha20_poly1305_open_data data;
   if (chacha20_poly1305_asm_capable() && iovecs.size() <= 1 &&
-      aadvecs.size() <= 1) {
+      aadvecs.size() <= 1 && !old) {
     // TODO(crbug.com/473454967): Support more than 1 ciphertext segment.
     OPENSSL_memcpy(data.in.key, key, 32);
     data.in.counter = 0;
@@ -297,7 +341,21 @@ static int chacha20_poly1305_openv_detached(const uint8_t *key,
                            aadvecs.size() >= 1 ? aadvecs[0].len : 0, &data);
   } else {
     poly1305_state ctx;
-    size_t ad_len = calc_tag_pre(&ctx, key, nonce.data(), aadvecs);
+    if (old) {
+      alignas(16) uint8_t poly1305_key[32];
+      OPENSSL_memset(poly1305_key, 0, sizeof(poly1305_key));
+      CRYPTO_chacha_20(poly1305_key, poly1305_key, sizeof(poly1305_key), key, nonce.data(),
+                      0);
+
+      CRYPTO_poly1305_init(&ctx, poly1305_key);
+      for (const CRYPTO_IVEC &aadvec : aadvecs) {
+        CRYPTO_poly1305_update(&ctx, aadvec.in, aadvec.len);
+        ad_len += aadvec.len;
+      }
+      poly1305_update_length(&ctx, ad_len);
+    } else {
+      ad_len = calc_tag_pre(&ctx, key, nonce.data(), aadvecs);
+    }
 
     size_t ciphertext_total = 0;
     size_t block = 1;
@@ -321,7 +379,12 @@ static int chacha20_poly1305_openv_detached(const uint8_t *key,
           return true;
         });
 
-    calc_tag_post(&ctx, data.out.tag, ciphertext_total, ad_len);
+    if (old) {
+      poly1305_update_length(&ctx, ciphertext_total);
+      CRYPTO_poly1305_finish(&ctx, data.out.tag);
+    } else {
+      calc_tag_post(&ctx, data.out.tag, ciphertext_total, ad_len);
+    }
   }
 
   if (CRYPTO_memcmp(data.out.tag, in_tag.data(), tag_len) != 0) {
@@ -340,7 +403,27 @@ static int aead_chacha20_poly1305_openv_detached(
       (struct aead_chacha20_poly1305_ctx *)&ctx->state;
 
   return chacha20_poly1305_openv_detached(c20_ctx->key, iovecs, nonce, in_tag,
-                                          aadvecs, ctx->tag_len);
+                                          aadvecs, ctx->tag_len, false);
+}
+
+static int aead_chacha20_poly1305_old_openv_detached(
+    const EVP_AEAD_CTX *ctx, Span<const CRYPTO_IOVEC> iovecs,
+    Span<const uint8_t> nonce, Span<const uint8_t> in_tag,
+    Span<const CRYPTO_IVEC> aadvecs) {
+  const struct aead_chacha20_poly1305_ctx *c20_ctx =
+      (struct aead_chacha20_poly1305_ctx *)&ctx->state;
+
+  if (nonce.size() != 8) {
+    OPENSSL_PUT_ERROR(CIPHER, CIPHER_R_UNSUPPORTED_NONCE_SIZE);
+    return 0;
+  }
+
+  alignas(4) uint8_t nonce_96[12];
+  OPENSSL_memset(nonce_96, 0, 4);
+  OPENSSL_memcpy(&nonce_96[4], nonce.data(), 8);
+
+  return chacha20_poly1305_openv_detached(c20_ctx->key, iovecs, nonce_96, in_tag,
+                                          aadvecs, ctx->tag_len, true);
 }
 
 static int aead_xchacha20_poly1305_openv_detached(
@@ -362,7 +445,7 @@ static int aead_xchacha20_poly1305_openv_detached(
   OPENSSL_memcpy(&derived_nonce[4], &nonce[16], 8);
 
   return chacha20_poly1305_openv_detached(derived_key, iovecs, derived_nonce,
-                                          in_tag, aadvecs, ctx->tag_len);
+                                          in_tag, aadvecs, ctx->tag_len, false);
 }
 
 static const EVP_AEAD aead_chacha20_poly1305 = {
@@ -377,6 +460,22 @@ static const EVP_AEAD aead_chacha20_poly1305 = {
     nullptr,  // openv
     aead_chacha20_poly1305_sealv,
     aead_chacha20_poly1305_openv_detached,
+    nullptr,  // get_iv
+    nullptr,  // tag_len
+};
+
+static const EVP_AEAD aead_chacha20_poly1305_old = {
+    32,                // key len
+    8,                 // nonce len
+    POLY1305_TAG_LEN,  // overhead
+    POLY1305_TAG_LEN,  // max tag length
+
+    aead_chacha20_poly1305_init,
+    nullptr,  // init_with_direction
+    aead_chacha20_poly1305_cleanup,
+    nullptr,  // openv
+    aead_chacha20_poly1305_old_sealv,
+    aead_chacha20_poly1305_old_openv_detached,
     nullptr,  // get_iv
     nullptr,  // tag_len
 };
@@ -398,6 +497,10 @@ static const EVP_AEAD aead_xchacha20_poly1305 = {
 };
 
 const EVP_AEAD *EVP_aead_chacha20_poly1305() { return &aead_chacha20_poly1305; }
+
+const EVP_AEAD *EVP_aead_chacha20_poly1305_old(void) {
+  return &aead_chacha20_poly1305_old;
+}
 
 const EVP_AEAD *EVP_aead_xchacha20_poly1305() {
   return &aead_xchacha20_poly1305;
