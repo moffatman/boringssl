@@ -4037,6 +4037,8 @@ struct ssl_ctx_st : public bssl::RefCounted<ssl_ctx_st> {
   // signal its sessions may be resumed across names in the server certificate.
   bool resumption_across_names_enabled : 1;
 
+  bool always_add_padding = false;
+
  private:
   friend RefCounted;
   ~ssl_ctx_st();

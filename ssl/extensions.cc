@@ -3950,7 +3950,7 @@ bool ssl_add_clienthello_tlsext(SSL_HANDSHAKE *hs, CBB *out, CBB *out_encoded,
     // The final extension must be non-empty. WebSphere Application
     // Server 7.0 is intolerant to the last extension being zero-length. See
     // https://crbug.com/363583.
-    if (last_was_empty && psk_extension_len == 0) {
+    if (ssl->ctx->always_add_padding || (last_was_empty && psk_extension_len == 0)) {
       padding_len = 1;
       // The addition of the padding extension may push us into the F5 bug.
       header_len += 4 + padding_len;
