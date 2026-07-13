@@ -41,7 +41,7 @@ extern "C" {
 // object should never leave the address space since the format is unstable.
 struct MLDSA65_private_key {
   union {
-    uint8_t bytes[32 + 32 + 64 + 256 * 4 * (5 + 6 + 6)];
+    uint8_t bytes[(32 + 64 + 256 * 4 * 6) + 32 + 256 * 4 * (5 + 6 + 6)];
     uint32_t alignment;
   } opaque;
 };
@@ -97,6 +97,9 @@ OPENSSL_EXPORT int MLDSA65_private_key_from_seed(
 // corresponds to |private_key|. Returns 1 on success and 0 on failure.
 OPENSSL_EXPORT int MLDSA65_public_from_private(
     struct MLDSA65_public_key *out_public_key,
+    const struct MLDSA65_private_key *private_key);
+
+const struct MLDSA65_public_key *MLDSA65_public_of_private(
     const struct MLDSA65_private_key *private_key);
 
 // MLDSA65_sign generates a signature for the message |msg| of length
@@ -174,6 +177,9 @@ OPENSSL_EXPORT int MLDSA65_marshal_public_key(
 OPENSSL_EXPORT int MLDSA65_parse_public_key(
     struct MLDSA65_public_key *public_key, CBS *in);
 
+int MLDSA65_public_keys_equal(const struct MLDSA65_public_key *a,
+                              const struct MLDSA65_public_key *b);
+
 
 // ML-DSA-87.
 //
@@ -184,7 +190,7 @@ OPENSSL_EXPORT int MLDSA65_parse_public_key(
 // object should never leave the address space since the format is unstable.
 struct MLDSA87_private_key {
   union {
-    uint8_t bytes[32 + 32 + 64 + 256 * 4 * (7 + 8 + 8)];
+    uint8_t bytes[(32 + 64 + 256 * 4 * 8) + 32 + 256 * 4 * (7 + 8 + 8)];
     uint32_t alignment;
   } opaque;
 };
@@ -240,6 +246,9 @@ OPENSSL_EXPORT int MLDSA87_private_key_from_seed(
 // corresponds to |private_key|. Returns 1 on success and 0 on failure.
 OPENSSL_EXPORT int MLDSA87_public_from_private(
     struct MLDSA87_public_key *out_public_key,
+    const struct MLDSA87_private_key *private_key);
+
+const struct MLDSA87_public_key *MLDSA87_public_of_private(
     const struct MLDSA87_private_key *private_key);
 
 // MLDSA87_sign generates a signature for the message |msg| of length
@@ -317,6 +326,8 @@ OPENSSL_EXPORT int MLDSA87_marshal_public_key(
 OPENSSL_EXPORT int MLDSA87_parse_public_key(
     struct MLDSA87_public_key *public_key, CBS *in);
 
+int MLDSA87_public_keys_equal(const struct MLDSA87_public_key *a,
+                              const struct MLDSA87_public_key *b);
 
 // ML-DSA-44.
 
@@ -324,7 +335,7 @@ OPENSSL_EXPORT int MLDSA87_parse_public_key(
 // object should never leave the address space since the format is unstable.
 struct MLDSA44_private_key {
   union {
-    uint8_t bytes[32 + 32 + 64 + 256 * 4 * (4 + 4 + 4)];
+    uint8_t bytes[(32 + 64 + 256 * 4 * 4) + 32 + 256 * 4 * (4 + 4 + 4)];
     uint32_t alignment;
   } opaque;
 };
@@ -380,6 +391,9 @@ OPENSSL_EXPORT int MLDSA44_private_key_from_seed(
 // corresponds to |private_key|. Returns 1 on success and 0 on failure.
 OPENSSL_EXPORT int MLDSA44_public_from_private(
     struct MLDSA44_public_key *out_public_key,
+    const struct MLDSA44_private_key *private_key);
+
+const struct MLDSA44_public_key *MLDSA44_public_of_private(
     const struct MLDSA44_private_key *private_key);
 
 // MLDSA44_sign generates a signature for the message |msg| of length
@@ -457,6 +471,8 @@ OPENSSL_EXPORT int MLDSA44_marshal_public_key(
 OPENSSL_EXPORT int MLDSA44_parse_public_key(
     struct MLDSA44_public_key *public_key, CBS *in);
 
+int MLDSA44_public_keys_equal(const struct MLDSA44_public_key *a,
+                              const struct MLDSA44_public_key *b);
 
 #if defined(__cplusplus)
 }  // extern C

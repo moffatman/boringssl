@@ -19,6 +19,8 @@ import (
 	"fmt"
 	"math/big"
 	"slices"
+
+	"filippo.io/mldsa"
 )
 
 type signer interface {
@@ -286,6 +288,56 @@ func (e *ed25519Signer) verifyMessage(key crypto.PublicKey, msg, sig []byte) err
 	return nil
 }
 
+type mldsaSigner struct{}
+
+func (m *mldsaSigner) supportsKey(key crypto.PrivateKey) bool {
+	_, ok := key.(*mldsa.PrivateKey)
+	return ok
+}
+
+func (m *mldsaSigner) signMessage(key crypto.PrivateKey, config *Config, msg []byte) ([]byte, error) {
+	privKey, ok := key.(*mldsa.PrivateKey)
+	if !ok {
+		return nil, errors.New("invalid key type for ML-DSA")
+	}
+
+	return privKey.Sign(nil, msg, nil)
+}
+
+func (m *mldsaSigner) verifyMessage(key crypto.PublicKey, msg, sig []byte) error {
+	pubKey, ok := key.(*mldsa.PublicKey)
+	if !ok {
+		return errors.New("invalid key type for ML-DSA")
+	}
+
+	return mldsa.Verify(pubKey, msg, sig, nil)
+}
+
+type mldsaSigner struct{}
+
+func (m *mldsaSigner) supportsKey(key crypto.PrivateKey) bool {
+	_, ok := key.(*mldsa.PrivateKey)
+	return ok
+}
+
+func (m *mldsaSigner) signMessage(key crypto.PrivateKey, config *Config, msg []byte) ([]byte, error) {
+	privKey, ok := key.(*mldsa.PrivateKey)
+	if !ok {
+		return nil, errors.New("invalid key type for ML-DSA")
+	}
+
+	return privKey.Sign(nil, msg, nil)
+}
+
+func (m *mldsaSigner) verifyMessage(key crypto.PublicKey, msg, sig []byte) error {
+	pubKey, ok := key.(*mldsa.PublicKey)
+	if !ok {
+		return errors.New("invalid key type for ML-DSA")
+	}
+
+	return mldsa.Verify(pubKey, msg, sig, nil)
+}
+
 func getSigner(isClient bool, version uint16, key any, config *Config, sigAlg signatureAlgorithm, isVerify bool) (signer, error) {
 	// TLS 1.1 and below use legacy signature algorithms.
 	if version < VersionTLS12 || (!isVerify && config.Bugs.AlwaysSignAsLegacyVersion) {
@@ -346,6 +398,12 @@ func getSigner(isClient bool, version uint16, key any, config *Config, sigAlg si
 		return &rsaPSSSigner{crypto.SHA512}, nil
 	case signatureEd25519:
 		return &ed25519Signer{}, nil
+	case signatureMLDSA44:
+		return &mldsaSigner{}, nil
+	case signatureMLDSA65:
+		return &mldsaSigner{}, nil
+	case signatureMLDSA87:
+		return &mldsaSigner{}, nil
 	}
 
 	return nil, fmt.Errorf("unsupported signature algorithm %04x", sigAlg)

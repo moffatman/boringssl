@@ -268,8 +268,10 @@ const EVP_PKEY_ASN1_METHOD ec_asn1_meth = {
     eckey_priv_encode,
 
     /*set_priv_raw=*/NULL,
+    /*set_priv_seed=*/nullptr,
     /*set_pub_raw=*/NULL,
     /*get_priv_raw=*/NULL,
+    /*get_priv_seed=*/nullptr,
     /*get_pub_raw=*/NULL,
     eckey_set1_tls_encodedpoint,
     eckey_get1_tls_encodedpoint,

@@ -274,7 +274,7 @@ bcm_infallible BCM_sha512_256_final(uint8_t out[BCM_SHA512_256_DIGEST_LENGTH],
 
 struct BCM_mldsa65_private_key {
   union {
-    uint8_t bytes[32 + 32 + 64 + 256 * 4 * (5 + 6 + 6)];
+    uint8_t bytes[(32 + 64 + 256 * 4 * 6) + 32 + 256 * 4 * (5 + 6 + 6)];
     uint32_t alignment;
   } opaque;
 };
@@ -304,6 +304,10 @@ OPENSSL_EXPORT bcm_status BCM_mldsa65_private_key_from_seed(
 
 OPENSSL_EXPORT bcm_status BCM_mldsa65_public_from_private(
     struct BCM_mldsa65_public_key *out_public_key,
+    const struct BCM_mldsa65_private_key *private_key);
+
+// BCM_mldsa65_public_of_private returns the public half of |private_key|.
+const struct BCM_mldsa65_public_key *BCM_mldsa65_public_of_private(
     const struct BCM_mldsa65_private_key *private_key);
 
 OPENSSL_EXPORT bcm_status
@@ -394,6 +398,11 @@ OPENSSL_EXPORT bcm_status BCM_mldsa65_verify_internal(
 OPENSSL_EXPORT bcm_status BCM_mldsa65_marshal_private_key(
     CBB *out, const struct BCM_mldsa65_private_key *private_key);
 
+// BCM_mldsa65_public_keys_equal returns one if |a| and |b| are equal and zero
+// otherwise.
+int BCM_mldsa65_public_keys_equal(const struct BCM_mldsa65_public_key *a,
+                                  const struct BCM_mldsa65_public_key *b);
+
 
 // BCM_MLDSA87_PRIVATE_KEY_BYTES is the number of bytes in an encoded ML-DSA-87
 // private key.
@@ -409,7 +418,7 @@ OPENSSL_EXPORT bcm_status BCM_mldsa65_marshal_private_key(
 
 struct BCM_mldsa87_private_key {
   union {
-    uint8_t bytes[32 + 32 + 64 + 256 * 4 * (7 + 8 + 8)];
+    uint8_t bytes[(32 + 64 + 256 * 4 * 8) + 32 + 256 * 4 * (7 + 8 + 8)];
     uint32_t alignment;
   } opaque;
 };
@@ -439,6 +448,10 @@ OPENSSL_EXPORT bcm_status BCM_mldsa87_private_key_from_seed(
 
 OPENSSL_EXPORT bcm_status BCM_mldsa87_public_from_private(
     struct BCM_mldsa87_public_key *out_public_key,
+    const struct BCM_mldsa87_private_key *private_key);
+
+// BCM_mldsa87_public_of_private returns the public half of |private_key|.
+const struct BCM_mldsa87_public_key *BCM_mldsa87_public_of_private(
     const struct BCM_mldsa87_private_key *private_key);
 
 OPENSSL_EXPORT bcm_status
@@ -529,6 +542,11 @@ OPENSSL_EXPORT bcm_status BCM_mldsa87_verify_internal(
 OPENSSL_EXPORT bcm_status BCM_mldsa87_marshal_private_key(
     CBB *out, const struct BCM_mldsa87_private_key *private_key);
 
+// BCM_mldsa87_public_keys_equal returns one if |a| and |b| are equal and zero
+// otherwise.
+int BCM_mldsa87_public_keys_equal(const struct BCM_mldsa87_public_key *a,
+                                  const struct BCM_mldsa87_public_key *b);
+
 // BCM_MLDSA44_PRIVATE_KEY_BYTES is the number of bytes in an encoded ML-DSA-44
 // private key.
 #define BCM_MLDSA44_PRIVATE_KEY_BYTES 2560
@@ -543,7 +561,7 @@ OPENSSL_EXPORT bcm_status BCM_mldsa87_marshal_private_key(
 
 struct BCM_mldsa44_private_key {
   union {
-    uint8_t bytes[32 + 32 + 64 + 256 * 4 * (4 + 4 + 4)];
+    uint8_t bytes[(32 + 64 + 256 * 4 * 4) + 32 + 256 * 4 * (4 + 4 + 4)];
     uint32_t alignment;
   } opaque;
 };
@@ -573,6 +591,10 @@ OPENSSL_EXPORT bcm_status BCM_mldsa44_private_key_from_seed(
 
 OPENSSL_EXPORT bcm_status BCM_mldsa44_public_from_private(
     struct BCM_mldsa44_public_key *out_public_key,
+    const struct BCM_mldsa44_private_key *private_key);
+
+// BCM_mldsa44_public_of_private returns the public half of |private_key|.
+const struct BCM_mldsa44_public_key *BCM_mldsa44_public_of_private(
     const struct BCM_mldsa44_private_key *private_key);
 
 OPENSSL_EXPORT bcm_status
@@ -662,6 +684,11 @@ OPENSSL_EXPORT bcm_status BCM_mldsa44_verify_internal(
 // NIST format for ML-DSA-44 private keys.
 OPENSSL_EXPORT bcm_status BCM_mldsa44_marshal_private_key(
     CBB *out, const struct BCM_mldsa44_private_key *private_key);
+
+// BCM_mldsa44_public_keys_equal returns one if |a| and |b| are equal and zero
+// otherwise.
+int BCM_mldsa44_public_keys_equal(const struct BCM_mldsa44_public_key *a,
+                                  const struct BCM_mldsa44_public_key *b);
 
 
 // ML-KEM

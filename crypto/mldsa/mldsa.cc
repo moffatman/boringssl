@@ -71,6 +71,13 @@ int MLDSA65_public_from_private(struct MLDSA65_public_key *out_public_key,
       reinterpret_cast<const BCM_mldsa65_private_key *>(private_key)));
 }
 
+const struct MLDSA65_public_key *MLDSA65_public_of_private(
+    const struct MLDSA65_private_key *private_key) {
+      return reinterpret_cast<const struct MLDSA65_public_key *>(
+        BCM_mldsa65_public_of_private(
+          reinterpret_cast<const BCM_mldsa65_private_key *>(private_key)));
+}
+
 int MLDSA65_sign(uint8_t out_encoded_signature[MLDSA65_SIGNATURE_BYTES],
                  const struct MLDSA65_private_key *private_key,
                  const uint8_t *msg, size_t msg_len, const uint8_t *context,
@@ -141,6 +148,13 @@ int MLDSA65_parse_public_key(struct MLDSA65_public_key *public_key, CBS *in) {
       reinterpret_cast<BCM_mldsa65_public_key *>(public_key), in));
 }
 
+int MLDSA65_public_keys_equal(const struct MLDSA65_public_key *a,
+                              const struct MLDSA65_public_key *b) {
+  return BCM_mldsa65_public_keys_equal(
+    reinterpret_cast<const BCM_mldsa65_public_key *>(a),
+    reinterpret_cast<const BCM_mldsa65_public_key *>(b));
+}
+
 int MLDSA87_generate_key(
     uint8_t out_encoded_public_key[MLDSA87_PUBLIC_KEY_BYTES],
     uint8_t out_seed[MLDSA_SEED_BYTES],
@@ -164,6 +178,13 @@ int MLDSA87_public_from_private(struct MLDSA87_public_key *out_public_key,
   return bcm_success(BCM_mldsa87_public_from_private(
       reinterpret_cast<BCM_mldsa87_public_key *>(out_public_key),
       reinterpret_cast<const BCM_mldsa87_private_key *>(private_key)));
+}
+
+const struct MLDSA87_public_key *MLDSA87_public_of_private(
+    const struct MLDSA87_private_key *private_key) {
+      return reinterpret_cast<const struct MLDSA87_public_key *>(
+        BCM_mldsa87_public_of_private(
+          reinterpret_cast<const BCM_mldsa87_private_key *>(private_key)));
 }
 
 int MLDSA87_sign(uint8_t out_encoded_signature[MLDSA87_SIGNATURE_BYTES],
@@ -236,6 +257,13 @@ int MLDSA87_parse_public_key(struct MLDSA87_public_key *public_key, CBS *in) {
       reinterpret_cast<BCM_mldsa87_public_key *>(public_key), in));
 }
 
+int MLDSA87_public_keys_equal(const struct MLDSA87_public_key *a,
+                              const struct MLDSA87_public_key *b) {
+  return BCM_mldsa87_public_keys_equal(
+    reinterpret_cast<const BCM_mldsa87_public_key *>(a),
+    reinterpret_cast<const BCM_mldsa87_public_key *>(b));
+}
+
 int MLDSA44_generate_key(
     uint8_t out_encoded_public_key[MLDSA44_PUBLIC_KEY_BYTES],
     uint8_t out_seed[MLDSA_SEED_BYTES],
@@ -259,6 +287,13 @@ int MLDSA44_public_from_private(struct MLDSA44_public_key *out_public_key,
   return bcm_success(BCM_mldsa44_public_from_private(
       reinterpret_cast<BCM_mldsa44_public_key *>(out_public_key),
       reinterpret_cast<const BCM_mldsa44_private_key *>(private_key)));
+}
+
+const struct MLDSA44_public_key *MLDSA44_public_of_private(
+    const struct MLDSA44_private_key *private_key) {
+      return reinterpret_cast<const struct MLDSA44_public_key *>(
+        BCM_mldsa44_public_of_private(
+          reinterpret_cast<const BCM_mldsa44_private_key *>(private_key)));
 }
 
 int MLDSA44_sign(uint8_t out_encoded_signature[MLDSA44_SIGNATURE_BYTES],
@@ -329,4 +364,11 @@ int MLDSA44_marshal_public_key(CBB *out,
 int MLDSA44_parse_public_key(struct MLDSA44_public_key *public_key, CBS *in) {
   return bcm_success(BCM_mldsa44_parse_public_key(
       reinterpret_cast<BCM_mldsa44_public_key *>(public_key), in));
+}
+
+int MLDSA44_public_keys_equal(const struct MLDSA44_public_key *a,
+                              const struct MLDSA44_public_key *b) {
+  return BCM_mldsa44_public_keys_equal(
+    reinterpret_cast<const BCM_mldsa44_public_key *>(a),
+    reinterpret_cast<const BCM_mldsa44_public_key *>(b));
 }
