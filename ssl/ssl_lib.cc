@@ -3339,7 +3339,7 @@ void SSL_set_permute_extensions(SSL *ssl, int enabled) {
 }
 
 void SSL_CTX_set_always_add_padding(SSL_CTX *ctx, int enabled) {
-  ctx->always_add_padding = !!enabled;
+  FromOpaque(ctx)->always_add_padding = !!enabled;
 }
 
 int32_t SSL_get_ticket_age_skew(const SSL *ssl) {

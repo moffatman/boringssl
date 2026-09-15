@@ -341,6 +341,7 @@ static int chacha20_poly1305_openv_detached(const uint8_t *key,
                            aadvecs.size() >= 1 ? aadvecs[0].len : 0, &data);
   } else {
     poly1305_state ctx;
+    size_t ad_len = 0;
     if (old) {
       alignas(16) uint8_t poly1305_key[32];
       OPENSSL_memset(poly1305_key, 0, sizeof(poly1305_key));
