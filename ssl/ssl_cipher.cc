@@ -1341,6 +1341,7 @@ bool ssl_create_default_tls13_cipher_list(
   // For a client: AES-128 > AES-256 > ChaCha20.
   // For a server: (AES-128 | AES-256 | ChaCha20), i.e. defer to client
   // preference.
+#if defined(OPENSSL_ANDROID)
   static const uint16_t kCiphersAESHardware[] = {
       SSL_CIPHER_AES_128_GCM_SHA256,
       SSL_CIPHER_AES_256_GCM_SHA384,
@@ -1352,18 +1353,44 @@ bool ssl_create_default_tls13_cipher_list(
       false,
   };
   // If we do not have AES hardware:
-  // For a client: ChaCha20 > AES-128 > AES-256.
-  // For a server: ChaCha20 > (AES-128 | AES-256).
+  // For a client: AES-128 > AES-256 > ChaCha20.
+  // For a server: (AES-128 | AES-256). >ChaCha20
   static const uint16_t kCiphersNoAESHardware[] = {
-      SSL_CIPHER_CHACHA20_POLY1305_SHA256,
       SSL_CIPHER_AES_128_GCM_SHA256,
       SSL_CIPHER_AES_256_GCM_SHA384,
+      SSL_CIPHER_CHACHA20_POLY1305_SHA256,
+  };
+  // TODO: Not right
+  static const bool kInGroupFlagsNoAESHardware[] = {
+      true,
+      false,
+      false,
+  };
+#else
+  static const uint16_t kCiphersAESHardware[] = {
+      SSL_CIPHER_AES_256_GCM_SHA384,
+      SSL_CIPHER_CHACHA20_POLY1305_SHA256,
+      SSL_CIPHER_AES_128_GCM_SHA256,
+  };
+  static const bool kInGroupFlagsAESHardware[] = {
+      false,
+      false,
+      false,
+  };
+  // If we do not have AES hardware:
+  // For a client: AES-128 > ChaCha20 > AES-256.
+  // For a server: AES-128 > ChaCha20 > AES-256.
+  static const uint16_t kCiphersNoAESHardware[] = {
+      SSL_CIPHER_AES_256_GCM_SHA384,
+      SSL_CIPHER_CHACHA20_POLY1305_SHA256,
+      SSL_CIPHER_AES_128_GCM_SHA256,
   };
   static const bool kInGroupFlagsNoAESHardware[] = {
       false,
-      true,
+      false,
       false,
   };
+#endif
 
   Span<const uint16_t> ciphers = EVP_has_aes_hardware()
                                      ? Span(kCiphersAESHardware)
